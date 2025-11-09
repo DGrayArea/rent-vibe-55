@@ -1,73 +1,171 @@
-# Welcome to your Lovable project
+# Rent App - Next.js with Next-Auth & Prisma
 
-## Project info
+A modern student housing platform built with Next.js 16, Next-Auth v5, Prisma, and TypeScript.
 
-**URL**: https://lovable.dev/projects/481f9298-ede8-4109-8eac-5d61383c22fd
+## 🚀 Quick Start
 
-## How can I edit this code?
+### 1. Install Dependencies
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/481f9298-ede8-4109-8eac-5d61383c22fd) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+pnpm install
 ```
 
-**Edit a file directly in GitHub**
+### 2. Set Up Environment Variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Create a `.env` file in the root directory:
 
-**Use GitHub Codespaces**
+```env
+# Database
+DATABASE_URL="postgresql://user:password@localhost:5432/dbname?schema=public"
+DIRECT_URL="postgresql://user:password@localhost:5432/dbname?schema=public"
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# NextAuth
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="your-secret-key-here-generate-with-openssl-rand-base64-32"
+```
 
-## What technologies are used for this project?
+Generate NextAuth secret:
 
-This project is built with:
+```bash
+openssl rand -base64 32
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### 3. Set Up Database
 
-## How can I deploy this project?
+```bash
+# Generate Prisma Client
+pnpm db:generate
 
-Simply open [Lovable](https://lovable.dev/projects/481f9298-ede8-4109-8eac-5d61383c22fd) and click on Share -> Publish.
+# Push schema to database
+pnpm db:push
 
-## Can I connect a custom domain to my Lovable project?
+# Or create migration
+pnpm db:migrate
 
-Yes, you can!
+# Seed database with test users
+pnpm db:seed
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### 4. Run Development Server
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```bash
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## 📁 Project Structure
+
+```
+├── prisma/
+│   ├── schema.prisma          # Database schema (next-auth compatible)
+│   └── seed.ts                 # Database seed script
+├── app/                        # Next.js App Router
+│   ├── api/                    # API routes
+│   │   └── auth/              # Next-Auth endpoints
+│   ├── auth/                   # Auth pages
+│   ├── dashboard/              # Dashboard pages
+│   ├── agent/                  # Agent pages
+│   ├── admin/                  # Admin pages
+│   └── layout.tsx              # Root layout
+├── src/
+│   ├── components/             # React components
+│   ├── lib/                    # Utilities
+│   │   ├── prisma.ts          # Prisma client singleton
+│   │   ├── auth.ts            # Server-side auth helpers
+│   │   └── use-role.tsx       # Client-side role hooks
+│   ├── pages/                  # Page components
+│   ├── middleware.ts          # Next.js middleware for route protection
+│   └── types/                  # TypeScript types
+└── public/                     # Static assets
+```
+
+## 🔐 Authentication
+
+This project uses **Next-Auth v5** with Prisma adapter for authentication.
+
+### Features
+
+- ✅ Email/password authentication
+- ✅ Multi-role support (ADMIN, AGENT, STUDENT)
+- ✅ Protected routes with middleware
+- ✅ Server and client-side auth helpers
+- ✅ Type-safe session with role information
+
+### Using Auth on Server
+
+```tsx
+import { getCurrentUser, requireRole } from "@/lib/auth";
+
+export default async function Page() {
+  const user = await getCurrentUser();
+  // or
+  const session = await requireRole("ADMIN");
+}
+```
+
+### Using Auth on Client
+
+```tsx
+"use client";
+
+import { useSession } from "next-auth/react";
+import { useIsAdmin } from "@/lib/use-role";
+
+export default function Component() {
+  const { data: session } = useSession();
+  const isAdmin = useIsAdmin();
+
+  return <div>{session?.user?.email}</div>;
+}
+```
+
+### Protected Routes
+
+Routes are protected using Next.js middleware. See `src/middleware.ts` for configuration.
+
+## 🗄️ Database
+
+The Prisma schema follows next-auth patterns:
+
+- **User** - User accounts with roles
+- **Account** - OAuth provider accounts (for future OAuth support)
+- **Session** - User sessions
+- **VerificationToken** - Email verification tokens
+
+### Roles
+
+- `ADMIN` - Full system access
+- `AGENT` - Property management access
+- `STUDENT` - Default user role
+
+## 🧪 Test Users
+
+After seeding, you can login with:
+
+- **admin@example.com** / admin123456 (ADMIN)
+- **isamubarak@example.com** / isamubarak123456 (AGENT)
+- **student@example.com** / student123456 (STUDENT)
+
+## 📝 Scripts
+
+- `pnpm dev` - Start development server
+- `pnpm build` - Build for production
+- `pnpm start` - Start production server
+- `pnpm db:generate` - Generate Prisma Client
+- `pnpm db:push` - Push schema to database
+- `pnpm db:migrate` - Run migrations
+- `pnpm db:studio` - Open Prisma Studio
+- `pnpm db:seed` - Seed database
+
+## 🚀 Production
+
+1. Set environment variables in production
+2. Run `pnpm build`
+3. Start with `pnpm start`
+
+## 📚 Learn More
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Next-Auth Documentation](https://authjs.dev)
+- [Prisma Documentation](https://www.prisma.io/docs)
