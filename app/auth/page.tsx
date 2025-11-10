@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { signIn, useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,9 +25,23 @@ import { Home } from "lucide-react";
 import Link from "next/link";
 
 export default function AuthPage() {
-  const router = useRouter();
+  const { data: session, status } = useSession();
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState<"STUDENT" | "AGENT">("STUDENT");
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      const userRole = session.user.role;
+      if (userRole === "ADMIN") {
+        window.location.href = "/admin/dashboard";
+      } else if (userRole === "AGENT") {
+        window.location.href = "/agent/dashboard";
+      } else {
+        window.location.href = "/dashboard";
+      }
+    }
+  }, [session, status]);
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -65,12 +78,6 @@ export default function AuthPage() {
         throw new Error(data.error || "Failed to create account");
       }
 
-      toast.success(
-        role === "AGENT"
-          ? "Account created! Please wait for admin verification."
-          : "Account created successfully!"
-      );
-
       // Sign in after signup
       const result = await signIn("credentials", {
         email,
@@ -79,24 +86,40 @@ export default function AuthPage() {
       });
 
       if (result?.ok) {
-        // Wait a bit for session to be established
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        toast.success(
+          role === "AGENT"
+            ? "Account created! Please wait for admin verification."
+            : "Account created successfully!"
+        );
 
-        // Get user session to determine redirect (fetch actual role from session)
-        const sessionRes = await fetch("/api/auth/session");
-        const session = await sessionRes.json();
-        const userRole = session?.user?.role;
+        // Wait for session to be established
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        router.refresh();
+        // Fetch session to get actual role from database
+        try {
+          const sessionRes = await fetch("/api/auth/session", {
+            cache: "no-store",
+          });
+          const sessionData = await sessionRes.json();
+          const userRole = sessionData?.user?.role || role;
 
-        // Use hard redirect to ensure session is loaded
-        if (userRole === "ADMIN") {
-          window.location.href = "/admin/dashboard";
-        } else if (userRole === "AGENT") {
-          window.location.href = "/agent/dashboard";
-        } else {
-          window.location.href = "/dashboard";
+          // Use window.location.replace for hard redirect
+          if (userRole === "ADMIN") {
+            window.location.replace("/admin/dashboard");
+          } else if (userRole === "AGENT") {
+            window.location.replace("/agent/dashboard");
+          } else {
+            window.location.replace("/dashboard");
+          }
+        } catch (error) {
+          // Fallback: redirect based on signup role
+          console.error("Error fetching session:", error);
+          const redirectPath =
+            role === "AGENT" ? "/agent/dashboard" : "/dashboard";
+          window.location.replace(redirectPath);
         }
+      } else if (result?.error) {
+        toast.error(result.error || "Failed to sign in after signup");
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -122,26 +145,33 @@ export default function AuthPage() {
 
       if (result?.error) {
         toast.error("Invalid credentials");
+        setLoading(false);
       } else if (result?.ok) {
         toast.success("Welcome back!");
 
-        // Wait a bit for session to be established
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // Wait for session to be established
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        // Get user session to determine redirect
-        const sessionRes = await fetch("/api/auth/session");
-        const session = await sessionRes.json();
-        const userRole = session?.user?.role;
+        // Fetch session to get role
+        try {
+          const sessionRes = await fetch("/api/auth/session", {
+            cache: "no-store",
+          });
+          const sessionData = await sessionRes.json();
+          const userRole = sessionData?.user?.role;
 
-        router.refresh();
-
-        // Use hard redirect to ensure session is loaded
-        if (userRole === "ADMIN") {
-          window.location.href = "/admin/dashboard";
-        } else if (userRole === "AGENT") {
-          window.location.href = "/agent/dashboard";
-        } else {
-          window.location.href = "/dashboard";
+          // Use window.location.replace for hard redirect (doesn't add to history)
+          if (userRole === "ADMIN") {
+            window.location.replace("/admin/dashboard");
+          } else if (userRole === "AGENT") {
+            window.location.replace("/agent/dashboard");
+          } else {
+            window.location.replace("/dashboard");
+          }
+        } catch (error) {
+          // Fallback: try redirecting anyway
+          console.error("Error fetching session:", error);
+          window.location.replace("/dashboard");
         }
       }
     } catch (error: any) {
